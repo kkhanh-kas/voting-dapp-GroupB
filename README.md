@@ -4,7 +4,7 @@ Xây dựng ứng dụng dApp bầu chọn trên nền tảng Ethereum.
 
 ---
 
-## Kiến Trúc Hệ Thống
+## Kiến trúc hệ Thống
 
 Hệ thống gồm 3 lớp giao tiếp với nhau:
 
@@ -16,11 +16,11 @@ graph TD
 ```
 
 - **Blockchain là Database:** Mọi dữ liệu (ứng viên, số phiếu, trạng thái đã vote) đều ở trên đó, không có server hay database truyền thống.
-- **Tính Phi Tập Trung:** Đảm bảo tính minh bạch và bảo mật cho quá trình bầu chọn.
+- **Tính phi tập trung:** Đảm bảo tính minh bạch và bảo mật cho quá trình bầu chọn.
 
 ---
 
-## Luồng Hoạt Động
+## Luồng hoạt động
 
 ### 1. Khởi động ứng dụng
 Khi người dùng mở web, Next.js thực hiện song song:
@@ -33,7 +33,7 @@ Khi người dùng mở web, Next.js thực hiện song song:
 - Frontend nhận được địa chỉ ví (dạng `0xAbc...123`).
 - **Kiểm tra quyền:** Gọi vào contract để hỏi địa chỉ này đã vote chưa thông qua mapping `hasVoted` để ẩn/hiện nút Vote.
 
-### 3. Quy trình Bỏ phiếu
+### 3. Quy trình bỏ phiếu
 1. **Chọn ứng viên:** Người dùng chọn ứng viên từ danh sách thả xuống.
 2. **Xác nhận giao dịch:** Bấm **Vote**, ký giao dịch và xác nhận phí gas qua MetaMask.
 3. **Thực thi trên Contract:** Hàm `vote()` thực hiện các bước kiểm tra:
@@ -50,7 +50,7 @@ Khi người dùng mở web, Next.js thực hiện song song:
 | **Ngoài khung giờ** | Contract revert với lý do từ modifier `withinVotingPeriod`. |
 | **Hết phí Gas** | MetaMask cảnh báo hoặc hiển thị "Insufficient gas". |
 
-### 5. Trang Quản trị (Admin Panel)
+### 5. Trang quản trị (Admin Panel)
 Truy cập tại `/admin` (Chỉ dành cho Owner):
 - **Thêm ứng viên:** Nhập tên -> `addCandidate()` -> Tự động cập nhật danh sách.
 - **Cài đặt thời gian:** Chọn `startTime` và `endTime` -> Lưu giá trị timestamp vào contract.
@@ -62,7 +62,7 @@ Truy cập tại `/admin` (Chỉ dành cho Owner):
 
 ---
 
-## Công Nghệ Sử Dụng
+## Công nghệ sử Dụng
 
 - **Smart Contract:** Solidity 0.8.x
 - **Framework:** Hardhat
