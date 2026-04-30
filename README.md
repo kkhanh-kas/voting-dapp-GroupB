@@ -53,7 +53,7 @@ Khi người dùng mở web, Next.js thực hiện song song:
 | Tình huống | Cách xử lý |
 | :---: | :---: |
 | **Từ chối giao dịch** | Hiển thị "Transaction rejected by user". |
-| **Bầu chọn lần hai** | Contract revert với lý do "Ban da bo phieu roi". |
+| **Bầu chọn lần hai** | Contract revert với lý do "You have already voted". |
 | **Ngoài khung giờ** | Contract revert với lý do từ modifier `withinVotingPeriod`. |
 | **Hết phí Gas** | MetaMask cảnh báo hoặc hiển thị "Insufficient gas". |
 
