@@ -1,68 +1,68 @@
 # Voting dApp - Group B
 
-Decentralized voting application built on Ethereum.
+Xây dựng ứng dụng dApp bầu chọn trên nền tảng Ethereum.
 
 ---
 
-## System Architecture
+## Kiến Trúc Hệ Thống
 
-The system consists of three main layers:
+Hệ thống gồm 3 lớp giao tiếp với nhau:
 
 ```mermaid
 graph TD
-    A[User - Browser + MetaMask] <--> B[Frontend - Next.js]
+    A[Người dùng - Browser + MetaMask] <--> B[Frontend - Next.js]
     B <--> C[Smart Contract - Solidity]
     C <--> D[(Blockchain Ethereum)]
 ```
 
-- **Blockchain as Database:** All data (candidates, vote counts, voting status) is stored directly on the Smart Contract.
-- **Decentralization:** No traditional server or database is used, ensuring transparency and security.
+- **Blockchain là Database:** Mọi dữ liệu (ứng viên, số phiếu, trạng thái đã vote) đều ở trên đó, không có server hay database truyền thống.
+- **Tính Phi Tập Trung:** Đảm bảo tính minh bạch và bảo mật cho quá trình bầu chọn.
 
 ---
 
-## Workflows
+## Luồng Hoạt Động
 
-### 1. Application Initialization
-When a user accesses the site, Next.js performs the following in parallel:
-- **Data Retrieval:** Fetches the candidate list and vote counts from the Smart Contract.
-- **Status Check:** Calls `getVotingStatus()` to determine the phase: `NOT_STARTED`, `ACTIVE`, or `ENDED`.
-- **Event Listening:** Connects to `votedEvent` to update the UI (table & charts) in real-time without page reloads.
+### 1. Khởi động ứng dụng
+Khi người dùng mở web, Next.js thực hiện song song:
+- **Đọc dữ liệu:** Lấy danh sách toàn bộ ứng viên và số phiếu hiện tại từ smart contract để hiển thị bảng kết quả.
+- **Kiểm tra trạng thái:** Gọi `getVotingStatus()` để xác định giai đoạn: `NOT_STARTED`, `ACTIVE`, hoặc `ENDED`.
+- **Lắng nghe sự kiện:** Bắt đầu lắng nghe `votedEvent` từ blockchain để tự cập nhật bảng và biểu đồ mà không cần reload trang.
 
-### 2. MetaMask Connection
-- User clicks **"Connect Wallet"** and confirms via MetaMask.
-- Frontend receives the wallet address (e.g., `0xAbc...123`).
-- **Permission Check:** Calls the `hasVoted` mapping to show or hide the Vote button based on the wallet's history.
+### 2. Kết nối ví MetaMask
+- Người dùng bấm **"Connect Wallet"** và xác nhận qua MetaMask.
+- Frontend nhận được địa chỉ ví (dạng `0xAbc...123`).
+- **Kiểm tra quyền:** Gọi vào contract để hỏi địa chỉ này đã vote chưa thông qua mapping `hasVoted` để ẩn/hiện nút Vote.
 
-### 3. Voting Process
-1. **Select Candidate:** User selects a candidate from the dropdown.
-2. **Confirm Transaction:** User clicks **Vote**, then signs the transaction and pays the gas fee via MetaMask.
-3. **Contract Execution:** The `vote()` function performs validation:
-    - User has not voted before.
-    - Candidate ID is valid.
-    - Current time is within the voting period.
-4. **Update:** Increments `voteCount`, marks `hasVoted`, and emits `votedEvent`.
+### 3. Quy trình Bỏ phiếu
+1. **Chọn ứng viên:** Người dùng chọn ứng viên từ danh sách thả xuống.
+2. **Xác nhận giao dịch:** Bấm **Vote**, ký giao dịch và xác nhận phí gas qua MetaMask.
+3. **Thực thi trên Contract:** Hàm `vote()` thực hiện các bước kiểm tra:
+    - Người này chưa từng vote.
+    - ID ứng viên hợp lệ.
+    - Đang trong thời gian bầu cử.
+4. **Cập nhật:** Tăng `voteCount`, đánh dấu `hasVoted` và phát ra `votedEvent`.
 
-### 4. Error Handling
-| Situation | Handling |
+### 4. Xử lý Lỗi
+| Tình huống | Cách xử lý |
 | :--- | :--- |
-| **Transaction Rejected** | Displays "Transaction rejected by user". |
-| **Double Voting** | Contract reverts with "Ban da bo phieu roi". |
-| **Outside Voting Period** | Blocked by the `withinVotingPeriod` modifier. |
-| **Insufficient Gas** | MetaMask warning or "Insufficient gas" message. |
+| **Từ chối giao dịch** | Hiển thị "Transaction rejected by user". |
+| **Bầu chọn lần hai** | Contract revert với lý do "Ban da bo phieu roi". |
+| **Ngoài khung giờ** | Contract revert với lý do từ modifier `withinVotingPeriod`. |
+| **Hết phí Gas** | MetaMask cảnh báo hoặc hiển thị "Insufficient gas". |
 
-### 5. Admin Panel
-Accessible at `/admin` (Owner only):
-- **Add Candidate:** Enter name -> `addCandidate()` -> Automatic list update.
-- **Set Voting Period:** Select `startTime` and `endTime` -> Saves timestamps to the Contract.
+### 5. Trang Quản trị (Admin Panel)
+Truy cập tại `/admin` (Chỉ dành cho Owner):
+- **Thêm ứng viên:** Nhập tên -> `addCandidate()` -> Tự động cập nhật danh sách.
+- **Cài đặt thời gian:** Chọn `startTime` và `endTime` -> Lưu giá trị timestamp vào contract.
 
-### 6. Deployment
-1. Compile and deploy bytecode to the **Sepolia** network.
-2. Update the contract address in the `.env` file.
-3. Configure the ABI in `frontend/lib/contract.ts`.
+### 6. Triển khai (Deployment)
+1. Biên dịch và đẩy bytecode lên mạng **Sepolia**.
+2. Nhận địa chỉ contract và cập nhật vào file `.env`.
+3. Cấu hình ABI trong `frontend/lib/contract.ts`.
 
 ---
 
-## Tech Stack
+## Công Nghệ Sử Dụng
 
 - **Smart Contract:** Solidity 0.8.x
 - **Framework:** Hardhat
