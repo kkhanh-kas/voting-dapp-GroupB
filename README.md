@@ -42,7 +42,7 @@ Khi người dùng mở web, Next.js thực hiện song song:
     - Đang trong thời gian bầu cử.
 4. **Cập nhật:** Tăng `voteCount`, đánh dấu `hasVoted` và phát ra `votedEvent`.
 
-### 4. Xử lý Lỗi
+### 4. Xử lý lỗi
 | Tình huống | Cách xử lý |
 | :--- | :--- |
 | **Từ chối giao dịch** | Hiển thị "Transaction rejected by user". |
@@ -62,7 +62,7 @@ Truy cập tại `/admin` (Chỉ dành cho Owner):
 
 ---
 
-## Công nghệ sử Dụng
+## Công nghệ sử dụng
 
 - **Smart Contract:** Solidity 0.8.x
 - **Framework:** Hardhat
