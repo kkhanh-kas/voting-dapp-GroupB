@@ -1,4 +1,4 @@
-/** 
+/* 
 deploy constructor
     → owner được set
     → 2 ứng viên mặc định được tạo
@@ -28,7 +28,7 @@ frontend gọi candidates[id]
 
 frontend gọi hasVoted[address]
     → true / false
-  */
+*/
 
 
 /// State Variables
