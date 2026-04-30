@@ -1,8 +1,15 @@
 # Voting dApp - Group B
 
-Xây dựng ứng dụng dApp bầu chọn trên nền tảng Ethereum.
+### Nhóm thực hiện (Group B)
 
----
+| STT | Họ và tên |
+| :--: | :---: |
+| 1 | Nguyễn Uyên Khánh |
+| 2 | Nguyễn Công Danh |
+| 3 | Nguyễn Phước Tình |
+| 4 | Lưu Mỹ Khánh |
+| 5 | Nguyễn Tấn Phát |
+| 6 | Huỳnh Hoài Nam |---
 
 ## Kiến trúc hệ thống
 
@@ -44,7 +51,7 @@ Khi người dùng mở web, Next.js thực hiện song song:
 
 ### 4. Xử lý lỗi
 | Tình huống | Cách xử lý |
-| :--- | :--- |
+| :---: | :---: |
 | **Từ chối giao dịch** | Hiển thị "Transaction rejected by user". |
 | **Bầu chọn lần hai** | Contract revert với lý do "Ban da bo phieu roi". |
 | **Ngoài khung giờ** | Contract revert với lý do từ modifier `withinVotingPeriod`. |
