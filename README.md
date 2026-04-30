@@ -4,7 +4,7 @@ Xây dựng ứng dụng dApp bầu chọn trên nền tảng Ethereum.
 
 ---
 
-## Kiến trúc hệ Thống
+## Kiến trúc hệ thống
 
 Hệ thống gồm 3 lớp giao tiếp với nhau:
 
