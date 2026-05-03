@@ -1,7 +1,7 @@
 {
   "name": "voting-dapp-groupb",
   "version": "1.0.0",
-  "description": "| STT | Họ và tên |\r | :--: | :---: |\r | 1 | Nguyễn Uyên Khánh |\r | 2 | Nguyễn Công Danh |\r | 3 | Nguyễn Phước Tình |\r | 4 | Lưu Mỹ Khánh |\r | 5 | Nguyễn Tấn Phát |\r | 6 | Huỳnh Hoài Nam |---",
+  "description": "Xây dựng ứng dụng dApp bầu chọn trên nền tảng Ethereum",
   "main": "hardhat.config.js",
   "directories": {
     "test": "test"
