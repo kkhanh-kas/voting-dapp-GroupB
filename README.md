@@ -36,7 +36,7 @@ voting-dapp-GroupB/
 │   └── deploy.js               # script deploy Hardhat
 ├── test/
 │   └── Voting.test.js          # toàn bộ test cases
-├── frontend/                   # thư mục Next.js cho front-end chínhchính
+├── frontend/                   # thư mục Next.js cho front-end chính
 │   ├── app/
 │   │   ├── page.tsx            # giao diện người bỏ phiếu
 │   │   └── admin/
