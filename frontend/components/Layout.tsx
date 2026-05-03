@@ -1,7 +1,7 @@
 import React from "react";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return (
+ return (
     <div className="min-h-screen bg-gray-50">
 
       {/* HEADER */}
