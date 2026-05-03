@@ -1,47 +1,82 @@
-/* 
-deploy constructor
-    → owner được set
-    → 2 ứng viên mặc định được tạo
-    → startTime / endTime được set
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-owner gọi addCandidate()
-    → thêm ứng viên mới vào mapping
-    → emit candidateAdded
+contract Voting {
+    /// State Variables
+    struct Candidate {
+        uint id;
+        string name;
+        uint voteCount;
+    }
 
-owner gọi setVotingPeriod()
-    → cập nhật startTime / endTime
+    mapping(uint => Candidate) public candidates;
+    mapping(address => bool) public hasVoted;
+    uint public candidatesCount;
+    address public owner;
+    uint public startTime;
+    uint public endTime;
 
-người dùng gọi vote()
-    → withinVotingPeriod check
-    → chưa vote check
-    → candidateId hợp lệ check
-    → hasVoted[msg.sender] = true
-    → voteCount++
-    → emit votedEvent
+    /// Events
+    event votedEvent(uint indexed _candidateId);
+    event candidateAdded(uint indexed _candidateId, string name);
 
-frontend gọi getVotingStatus()
-    → NOT_STARTED / ACTIVE / ENDED
+    /// Modifiers
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
 
-frontend gọi candidates[id]
-    → Solidity tự generate getter, không cần viết hàm
-    → trả về { id, name, voteCount }
+    modifier withinVotingPeriod() {
+        require(block.timestamp >= startTime, "Voting has not started yet");
+        require(block.timestamp <= endTime, "Voting has ended");
+        _;
+    }
 
-frontend gọi hasVoted[address]
-    → true / false
-*/
+    /// Constructor
+    constructor() {
+        owner = msg.sender;
+        startTime = block.timestamp;
+        endTime = block.timestamp + 1 days;
 
+        _addCandidate("Michael Anderson");
+        _addCandidate("Christopher Walker");
+        _addCandidate("Daniel Thompson");
+        _addCandidate("James Carter");
+    }
 
-/// State Variables
+    /// Internal Function
+    function _addCandidate(string memory _name) internal {
+        candidatesCount++;
+        candidates[candidatesCount] = Candidate(candidatesCount, _name, 0);
+    }
 
-/// Events
+    /// Owner Functions
+    function addCandidate(string memory _name) public onlyOwner {
+        candidatesCount++;
+        candidates[candidatesCount] = Candidate(candidatesCount, _name, 0);
+        emit candidateAdded(candidatesCount, _name);
+    }
 
-/// Modifiers
+    function setVotingPeriod(uint _startTime, uint _endTime) public onlyOwner {
+        require(_endTime > _startTime, "End time must be after start time");
+        startTime = _startTime;
+        endTime = _endTime;
+    }
 
-/// Constructor
+    /// Vote Function
+    function vote(uint _candidateId) public withinVotingPeriod {
+        require(!hasVoted[msg.sender], "You have already voted");
+        require(_candidateId > 0 && _candidateId <= candidatesCount, "Invalid candidate ID");
 
-/// Internal Function
+        hasVoted[msg.sender] = true;
+        candidates[_candidateId].voteCount++;
 
-/// Owner Functions
+        emit votedEvent(_candidateId);
+    }
 
-/// Vote Function
-
+    function getVotingStatus() public view returns (string memory) {
+        if (block.timestamp < startTime) return "NOT_STARTED";
+        if (block.timestamp >= startTime && block.timestamp <= endTime) return "ACTIVE";
+        return "ENDED";
+    }
+}

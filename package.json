@@ -1,0 +1,28 @@
+{
+  "name": "voting-dapp-groupb",
+  "version": "1.0.0",
+  "description": "| STT | Họ và tên |\r | :--: | :---: |\r | 1 | Nguyễn Uyên Khánh |\r | 2 | Nguyễn Công Danh |\r | 3 | Nguyễn Phước Tình |\r | 4 | Lưu Mỹ Khánh |\r | 5 | Nguyễn Tấn Phát |\r | 6 | Huỳnh Hoài Nam |---",
+  "main": "hardhat.config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kkhanh-kas/voting-dapp-GroupB.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kkhanh-kas/voting-dapp-GroupB/issues"
+  },
+  "homepage": "https://github.com/kkhanh-kas/voting-dapp-GroupB#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^17.4.2",
+    "hardhat": "^2.28.6"
+  }
+}

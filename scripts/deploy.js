@@ -1,5 +1,14 @@
-/**
- *Lấy account từ Hardhat/MetaMask để ký giao dịch deploy
- * Biên dịch Voting.sol thành bytecode
- * Đẩy bytecode lên mạng (local --> Sepolia) và in ra contract address
- */
+const { ethers } = require("hardhat");
+
+async function main() {
+  const Voting = await ethers.getContractFactory("Voting");
+  const voting = await Voting.deploy();
+  await voting.waitForDeployment();
+  const address = await voting.getAddress();
+  console.log("Voting contract deployed to:", address);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
