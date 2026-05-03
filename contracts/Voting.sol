@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getContract } from "@/lib/contract";
-import type { Candidate } from "./VoteChart";
+import type { Candidate } from "./VoteChart"; 
 import VoteChart from "./VoteChart";
 import Spinner from "@/components/ui/Spinner";
 import Toast from "@/components/ui/Toast";
