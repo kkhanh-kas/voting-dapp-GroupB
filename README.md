@@ -27,6 +27,34 @@ graph TD
 
 ---
 
+### Cấu trúc dự án 
+```
+voting-dapp-GroupB/
+├── contracts/
+│   └── Voting.sol              # 1 logic smart contract duy nhất 
+├── scripts/
+│   └── deploy.js               # script deploy Hardhat
+├── test/
+│   └── Voting.test.js          # toàn bộ test cases
+├── frontend/                   # thư mục Next.js cho front-end chínhchính
+│   ├── app/
+│   │   ├── page.tsx            # giao diện người bỏ phiếu
+│   │   └── admin/
+│   │       └── page.tsx        # giao diện của người quản trị 
+│   ├── components/
+│   │   ├── CandidateTable.tsx
+│   │   ├── VoteChart.tsx       # component biểu đồ (Chart.js)
+│   │   └── VotingStatus.tsx    # hiển thị trạng thái NOT_STARTED / ACTIVE / ENDED
+│   ├── lib/
+│   │   └── contract.ts         # contract address + ABI + cấu hình ethers 
+│   └── public/
+├── hardhat.config.js
+├── .env                      
+└── .gitignore
+```
+
+---
+
 ## Luồng hoạt động
 
 ### 1. Khởi động ứng dụng
