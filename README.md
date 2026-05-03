@@ -27,7 +27,7 @@ graph TD
 
 ---
 
-### Cấu trúc dự án 
+## Cấu trúc dự án 
 ```
 voting-dapp-GroupB/
 ├── contracts/
