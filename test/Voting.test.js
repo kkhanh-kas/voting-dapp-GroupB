@@ -62,4 +62,52 @@ describe("Voting", function () {
       .to.emit(voting, "votedEvent")
       .withArgs(2n);
   });
+
+  describe("Admin Candidate Management", function () {
+    it("updates candidate name and bio correctly", async function () {
+      await voting.connect(owner).updateCandidate(1, "Updated Name", "Updated Bio");
+      const candidate = await voting.candidates(1);
+      expect(candidate.name).to.equal("Updated Name");
+      expect(candidate.bio).to.equal("Updated Bio");
+    });
+
+    it("reverts when non-owner tries to update candidate", async function () {
+      await expect(
+        voting.connect(voter1).updateCandidate(1, "Updated Name", "Updated Bio")
+      ).to.be.revertedWith("Only owner can call this function");
+    });
+
+    it("reverts when updating an invalid or deleted candidate", async function () {
+      await expect(
+        voting.connect(owner).updateCandidate(99, "Name", "Bio")
+      ).to.be.revertedWith("Invalid candidate ID");
+
+      await voting.connect(owner).deleteCandidate(1);
+      await expect(
+        voting.connect(owner).updateCandidate(1, "Name", "Bio")
+      ).to.be.revertedWith("Candidate does not exist");
+    });
+
+    it("deletes a candidate by zeroing out the struct", async function () {
+      await voting.connect(owner).deleteCandidate(2);
+      const candidate = await voting.candidates(2);
+      expect(candidate.id).to.equal(0n);
+      expect(candidate.name).to.equal("");
+      expect(candidate.bio).to.equal("");
+      expect(candidate.voteCount).to.equal(0n);
+    });
+
+    it("reverts when non-owner tries to delete candidate", async function () {
+      await expect(voting.connect(voter1).deleteCandidate(1)).to.be.revertedWith(
+        "Only owner can call this function"
+      );
+    });
+
+    it("reverts when voting for a deleted candidate", async function () {
+      await voting.connect(owner).deleteCandidate(3);
+      await expect(voting.connect(voter1).vote(3)).to.be.revertedWith(
+        "Candidate does not exist"
+      );
+    });
+  });
 });

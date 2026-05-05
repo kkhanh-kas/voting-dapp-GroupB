@@ -1,89 +1,64 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getContract } from "@/lib/contract";
+import { useLang } from "@/components/Providers";
 
-type Status = "NOT_STARTED" | "ACTIVE" | "ENDED" | "LOADING";
+type Status = "NOT_STARTED" | "ACTIVE" | "ENDED";
 
-const bannerConfig: Record<
-  Exclude<Status, "LOADING">,
-  { bg: string; border: string; dot: string; text: string; label: string }
-> = {
-  NOT_STARTED: {
-    bg: "bg-amber-50",
-    border: "border-amber-300",
-    dot: "bg-amber-400",
-    text: "text-amber-800",
-    label: "Election has not started yet",
-  },
-  ACTIVE: {
-    bg: "bg-emerald-50",
-    border: "border-emerald-300",
-    dot: "bg-emerald-500",
-    text: "text-emerald-800",
-    label: "Election is ongoing",
-  },
-  ENDED: {
-    bg: "bg-red-50",
-    border: "border-red-300",
-    dot: "bg-red-500",
-    text: "text-red-800",
-    label: "Election has ended",
-  },
-};
+interface VotingStatusProps {
+  status: Status;
+}
 
-export default function VotingStatus() {
-  const [status, setStatus] = useState<Status>("LOADING");
+export default function VotingStatus({ status }: VotingStatusProps) {
+  const { t } = useLang();
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchStatus() {
-      try {
-        const contract = await getContract();
-        const raw: string = await contract.getVotingStatus();
-        if (!cancelled) {
-          setStatus(raw as Exclude<Status, "LOADING">);
-        }
-      } catch (err) {
-        console.error("Failed to fetch voting status:", err);
-      }
+  const getStatusConfig = () => {
+    switch (status) {
+      case "NOT_STARTED":
+        return {
+          bg: "bg-amber-500/10",
+          border: "border-amber-500/20",
+          dot: "bg-amber-500",
+          text: "text-amber-700 dark:text-amber-400",
+          label: t("status.notStarted"),
+        };
+      case "ACTIVE":
+        return {
+          bg: "bg-emerald-500/10",
+          border: "border-emerald-500/20",
+          dot: "bg-emerald-500",
+          text: "text-emerald-700 dark:text-emerald-400",
+          label: t("status.active"),
+        };
+      case "ENDED":
+        return {
+          bg: "bg-red-500/10",
+          border: "border-red-500/20",
+          dot: "bg-red-500",
+          text: "text-red-700 dark:text-red-400",
+          label: t("status.ended"),
+        };
     }
+  };
 
-    fetchStatus();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (status === "LOADING") {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 w-fit text-sm text-gray-500 animate-pulse">
-        <span className="inline-block w-2 h-2 rounded-full bg-gray-300" />
-        Checking election status…
-      </div>
-    );
-  }
-
-  const cfg = bannerConfig[status];
+  const cfg = getStatusConfig();
 
   return (
     <div
-      className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg border ${cfg.bg} ${cfg.border} w-fit`}
+      className={`flex items-center gap-2.5 px-4 py-2 rounded-full border ${cfg.bg} ${cfg.border} w-fit`}
       role="status"
       aria-live="polite"
     >
-      {/* Animated dot for ACTIVE */}
-      <span className="relative flex h-2.5 w-2.5">
+      <span className="relative flex h-2 w-2">
         {status === "ACTIVE" && (
           <span
             className={`animate-ping absolute inline-flex h-full w-full rounded-full ${cfg.dot} opacity-75`}
           />
         )}
         <span
-          className={`relative inline-flex rounded-full h-2.5 w-2.5 ${cfg.dot}`}
+          className={`relative inline-flex rounded-full h-2 w-2 ${cfg.dot}`}
         />
       </span>
+
       <span className={`text-sm font-medium ${cfg.text}`}>{cfg.label}</span>
     </div>
   );

@@ -30,27 +30,46 @@ graph TD
 ## Cấu trúc dự án 
 ```
 voting-dapp-GroupB/
+├── .env
+├── .env.example
+├── .gitignore
 ├── contracts/
-│   └── Voting.sol              # 1 logic smart contract duy nhất 
-├── scripts/
-│   └── deploy.js               # script deploy Hardhat
-├── test/
-│   └── Voting.test.js          # toàn bộ test cases
-├── frontend/                   # thư mục Next.js cho front-end chính
+│   └── Voting.sol
+├── frontend/
+│   ├── .env.local
+│   ├── next-env.d.ts
+│   ├── next.config.ts
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── postcss.config.js
+│   ├── tsconfig.json
 │   ├── app/
-│   │   ├── page.tsx            # giao diện người bỏ phiếu
+│   │   ├── global.css                  (CSS toàn cục)
+│   │   ├── layout.tsx                  (Server Component, bọc tất cả các trang)
+│   │   ├── page.tsx                    (giao diện người bầu)
 │   │   └── admin/
-│   │       └── page.tsx        # giao diện của người quản trị 
+│   │       └── page.tsx                (giao diện admin)
 │   ├── components/
-│   │   ├── CandidateTable.tsx
-│   │   ├── VoteChart.tsx       # component biểu đồ (Chart.js)
-│   │   └── VotingStatus.tsx    # hiển thị trạng thái NOT_STARTED / ACTIVE / ENDED
+│   │   ├── Header.tsx                  (Client Component, hiển thị ví và navbar)
+│   │   ├── CandidateTable.tsx          (bảng danh sách ứng viên)
+│   │   ├── VoteChart.tsx               (biểu đồ kết quả real-time)
+│   │   ├── VotingStatus.tsx            (hiển thị trạng thái bầu cử)
+│   │   └── ui/
+│   │       ├── Spinner.tsx             (loading indicator)
+│   │       └── Toast.tsx               (thông báo lỗi và thành công)
 │   ├── lib/
-│   │   └── contract.ts         # contract address + ABI + cấu hình ethers 
+│   │   └── contract.ts                 (ABI và khởi tạo Ethers.js)
+│   ├── types/
+│   │   └── ethereum.d.ts               (khai báo kiểu cho window.ethereum)
 │   └── public/
 ├── hardhat.config.js
-├── .env                      
-└── .gitignore
+├── package.json
+├── package-lock.json
+├── README.md
+├── scripts/
+│   └── deploy.js
+├── test/
+│   └── Voting.test.js
 ```
 
 ---
@@ -95,13 +114,91 @@ Truy cập tại `/admin` (Chỉ dành cho Owner):
 2. Nhận địa chỉ contract và cập nhật vào file `.env`.
 3. Cấu hình ABI trong `frontend/lib/contract.ts`.
 
+### 7. Hướng dẫn deploy và test trên Local (Hardhat)
+
+#### Yêu cầu trước khi chạy
+- Đã cài **Node.js 18+** và **npm**.
+- Đã cài **MetaMask** trên trình duyệt.
+- Đang đứng ở thư mục gốc `voting-dapp-GroupB`.
+
+#### Bước 1: Cài dependencies
+Chạy lần lượt:
+```bash
+npm install
+cd frontend
+npm install
+cd ..
+```
+
+#### Bước 2: Khởi chạy blockchain local
+Mở terminal #1:
+```bash
+npx hardhat node
+```
+Kỳ vọng thấy RPC chạy tại `http://127.0.0.1:8545` (Chain ID `31337`).
+
+#### Bước 3: Deploy contract lên localhost
+Mở terminal #2:
+```bash
+npx hardhat run scripts/deploy.js --network localhost
+```
+Sau khi chạy xong, copy địa chỉ từ output:
+`Voting contract deployed to: 0x...`
+
+#### Bước 4: Cấu hình địa chỉ contract cho frontend
+Tạo hoặc cập nhật file `frontend/.env.local`:
+```env
+NEXT_PUBLIC_CONTRACT_ADDRESS=0xDIA_CHI_VUA_DEPLOY
+```
+
+#### Bước 5: Chạy frontend
+Mở terminal #3:
+```bash
+cd frontend
+npm run dev
+```
+Truy cập: `http://localhost:3000`
+
+#### Bước 6: Cấu hình MetaMask mạng local
+Trong MetaMask, thêm/chuyển sang mạng:
+- **Network Name:** Hardhat Local
+- **RPC URL:** `http://127.0.0.1:8545`
+- **Chain ID:** `31337`
+- **Currency Symbol:** ETH
+
+Import một private key test được in ra từ terminal chạy `npx hardhat node`.
+
+#### Bước 7: Test nhanh bằng tay trên giao diện
+1. Vào `/admin` để kiểm tra quyền owner và thao tác quản trị.
+2. Thêm/cập nhật/xóa ứng viên (nếu chức năng đang bật).
+3. Vào `/` để bỏ phiếu bằng tài khoản voter.
+4. Xác nhận:
+   - Số phiếu tăng đúng theo ứng viên đã chọn.
+   - Không thể vote lần 2 bằng cùng một ví.
+   - UI tự cập nhật sau khi giao dịch được xác nhận.
+
+#### Bước 8: Chạy test smart contract
+Tại thư mục gốc:
+```bash
+npm test
+```
+Lệnh này chạy toàn bộ test trong `test/Voting.test.js`.
+
+#### Các lỗi thường gặp
+- **Wrong network (chainId không phải 31337):** chuyển MetaMask sang Hardhat Local.
+- **`EADDRINUSE 127.0.0.1:8545`:** cổng đã có tiến trình Hardhat khác chạy.
+- **Sai địa chỉ contract trên UI:** deploy lại và cập nhật `frontend/.env.local`, sau đó restart frontend.
+- **`Another next dev server is already running`:** tắt tiến trình Next.js cũ rồi chạy lại.
+
+> **Lưu ý quan trọng:** Mỗi lần restart Hardhat node, trạng thái chain bị reset. Bạn phải deploy lại contract, cập nhật địa chỉ mới trong `.env.local`, rồi khởi động lại frontend.
+
 ---
 
 ## Công nghệ sử dụng
 
-- **Smart Contract:** Solidity 0.8.x
-- **Framework:** Hardhat
-- **Frontend:** Next.js (App Router) + Tailwind CSS
+- **Smart Contract:** Solidity 0.8.28
+- **Framework:** Hardhat 2.28.6 
+- **Frontend:** Next.js (App Router) + Tailwind CSS 4.2.4
 - **Web3 Library:** Ethers.js v6
 - **Charts:** Chart.js
 - **Wallet:** MetaMask

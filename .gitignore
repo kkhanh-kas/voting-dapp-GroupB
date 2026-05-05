@@ -152,6 +152,8 @@ out/
 
 # Environment
 .env
+.env.local
+frontend/.env.local
 
 # Cursor (personal)
 .cursor/

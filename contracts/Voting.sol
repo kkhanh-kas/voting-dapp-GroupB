@@ -6,6 +6,7 @@ contract Voting {
     struct Candidate {
         uint id;
         string name;
+        string bio;
         uint voteCount;
     }
 
@@ -18,7 +19,9 @@ contract Voting {
 
     /// Events
     event votedEvent(uint indexed _candidateId);
-    event candidateAdded(uint indexed _candidateId, string name);
+    event candidateAdded(uint indexed _candidateId, string name, string bio);
+    event candidateUpdated(uint indexed _candidateId, string name, string bio);
+    event candidateDeleted(uint indexed _candidateId);
 
     /// Modifiers
     modifier onlyOwner() {
@@ -38,23 +41,23 @@ contract Voting {
         startTime = block.timestamp;
         endTime = block.timestamp + 1 days;
 
-        _addCandidate("Michael Anderson");
-        _addCandidate("Christopher Walker");
-        _addCandidate("Daniel Thompson");
-        _addCandidate("James Carter");
+        _addCandidate("Michael Anderson", "A seasoned leader with 10 years of experience in decentralized governance. Committed to transparency and community-driven decision making.");
+        _addCandidate("Christopher Walker", "Blockchain enthusiast and software engineer. Focuses on building scalable and secure infrastructure for Web3 applications.");
+        _addCandidate("Daniel Thompson", "Advocate for privacy rights and open-source technology. Believes in empowering individuals through decentralized tools.");
+        _addCandidate("James Carter", "Financial analyst turned crypto researcher. Dedicated to creating sustainable economic models for decentralized ecosystems.");
     }
 
     /// Internal Function
-    function _addCandidate(string memory _name) internal {
+    function _addCandidate(string memory _name, string memory _bio) internal {
         candidatesCount++;
-        candidates[candidatesCount] = Candidate(candidatesCount, _name, 0);
+        candidates[candidatesCount] = Candidate(candidatesCount, _name, _bio, 0);
     }
 
     /// Owner Functions
-    function addCandidate(string memory _name) public onlyOwner {
+    function addCandidate(string memory _name, string memory _bio) public onlyOwner {
         candidatesCount++;
-        candidates[candidatesCount] = Candidate(candidatesCount, _name, 0);
-        emit candidateAdded(candidatesCount, _name);
+        candidates[candidatesCount] = Candidate(candidatesCount, _name, _bio, 0);
+        emit candidateAdded(candidatesCount, _name, _bio);
     }
 
     function setVotingPeriod(uint _startTime, uint _endTime) public onlyOwner {
@@ -63,10 +66,26 @@ contract Voting {
         endTime = _endTime;
     }
 
+    function updateCandidate(uint _candidateId, string memory _name, string memory _bio) public onlyOwner {
+        require(_candidateId > 0 && _candidateId <= candidatesCount, "Invalid candidate ID");
+        require(bytes(candidates[_candidateId].name).length > 0, "Candidate does not exist");
+        candidates[_candidateId].name = _name;
+        candidates[_candidateId].bio = _bio;
+        emit candidateUpdated(_candidateId, _name, _bio);
+    }
+
+    function deleteCandidate(uint _candidateId) public onlyOwner {
+        require(_candidateId > 0 && _candidateId <= candidatesCount, "Invalid candidate ID");
+        require(bytes(candidates[_candidateId].name).length > 0, "Candidate does not exist");
+        delete candidates[_candidateId];
+        emit candidateDeleted(_candidateId);
+    }
+
     /// Vote Function
     function vote(uint _candidateId) public withinVotingPeriod {
         require(!hasVoted[msg.sender], "You have already voted");
         require(_candidateId > 0 && _candidateId <= candidatesCount, "Invalid candidate ID");
+        require(bytes(candidates[_candidateId].name).length > 0, "Candidate does not exist");
 
         hasVoted[msg.sender] = true;
         candidates[_candidateId].voteCount++;

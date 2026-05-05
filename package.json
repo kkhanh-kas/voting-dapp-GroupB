@@ -1,25 +1,16 @@
 {
   "name": "voting-dapp-groupb",
   "version": "1.0.0",
+  "private": true,
   "description": "Xây dựng ứng dụng dApp bầu chọn trên nền tảng Ethereum",
   "main": "hardhat.config.js",
-  "directories": {
-    "test": "test"
-  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "node": "npx hardhat node",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/kkhanh-kas/voting-dapp-GroupB.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/kkhanh-kas/voting-dapp-GroupB/issues"
-  },
-  "homepage": "https://github.com/kkhanh-kas/voting-dapp-GroupB#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "dotenv": "^17.4.2",

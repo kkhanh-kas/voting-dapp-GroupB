@@ -1,194 +1,111 @@
 "use client";
 
-/**
- * CandidateTable
- * - Renders the candidate list with live vote counts.
- * - Subscribes to the contract's "votedEvent" to refresh counts in real-time.
- * - Passes candidates down to VoteChart so the chart re-renders on every update.
- * - Cleans up the listener on unmount to prevent memory leaks.
- */
+import { useLang } from "@/components/Providers";
 
-import { useEffect, useState, useCallback } from "react";
-import { getContract } from "@/lib/contract";
-import type { Candidate } from "./VoteChart";
-import VoteChart from "./VoteChart";
-
-interface RawCandidate {
-  id: bigint;
+interface Candidate {
+  id: number;
   name: string;
-  voteCount: bigint;
+  bio?: string;
+  voteCount: number;
 }
 
-function toCandidate(raw: RawCandidate): Candidate {
-  return {
-    id: Number(raw.id),
-    name: raw.name,
-    voteCount: Number(raw.voteCount),
-  };
+interface CandidateTableProps {
+  candidates: Candidate[];
 }
 
-export default function CandidateTable() {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  /* Fetch all candidates from the contract */
-  const refreshCandidates = useCallback(async () => {
-    try {
-      const contract = await getContract();
-
-      /* Solidity getter: candidates(id) → { id, name, voteCount }
-         We keep fetching until a call reverts (no more candidates). */
-      const list: Candidate[] = [];
-      let id = 0;
-      while (true) {
-        try {
-          const raw: RawCandidate = await contract.candidates(id);
-          list.push(toCandidate(raw));
-          id++;
-        } catch {
-          break; // No more candidates
-        }
-      }
-
-      setCandidates(list);
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to load candidates");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  /* Subscribe to votedEvent; refresh data on every new vote */
-  useEffect(() => {
-    let contract: Awaited<ReturnType<typeof getContract>> | null = null;
-
-    async function setup() {
-      await refreshCandidates();
-
-      try {
-        contract = await getContract();
-
-        const handler = async () => {
-          /* Re-fetch all candidates so voteCount values are current */
-          await refreshCandidates();
-        };
-
-        contract.on("votedEvent", handler);
-
-        /* Cleanup: remove the listener when the component unmounts */
-        return () => {
-          contract?.off("votedEvent", handler);
-        };
-      } catch (err) {
-        console.error("Could not subscribe to votedEvent:", err);
-      }
-    }
-
-    const cleanupPromise = setup();
-
-    return () => {
-      cleanupPromise.then((cleanup) => cleanup?.());
-    };
-  }, [refreshCandidates]);
-
-  /* ── Render ─────────────────────────────────────────────────────────── */
-
-  if (loading) {
-    return (
-      <div className="space-y-2 animate-pulse">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-10 bg-gray-100 rounded-lg" />
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <p className="text-sm text-red-600 text-center py-6">
-        Error: {error}
-      </p>
-    );
-  }
+export default function CandidateTable({ candidates }: CandidateTableProps) {
+  const { t } = useLang();
 
   if (!candidates.length) {
     return (
-      <p className="text-sm text-gray-400 text-center py-6">
-        No candidates have been added yet.
-      </p>
+      <div className="p-8 text-center text-[var(--color-text-secondary)]">
+        {t("msg.noCandidates")}
+      </div>
     );
   }
 
-  const totalVotes = candidates.reduce((sum, c) => sum + c.voteCount, 0);
+  const highestVote = Math.max(...candidates.map((c) => c.voteCount));
 
   return (
-    <div className="space-y-6">
-      {/* Chart */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
-        <VoteChart candidates={candidates} />
-      </div>
+    <div className="overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="border-b border-[var(--color-border)]">
+          <tr>
+            <th className="px-4 py-3 text-left text-[var(--color-text-secondary)] font-medium">
+              {t("table.number")}
+            </th>
+            <th className="px-4 py-3 text-left text-[var(--color-text-secondary)] font-medium">
+              {t("table.name")}
+            </th>
+            <th className="px-4 py-3 text-right text-[var(--color-text-secondary)] font-medium">
+              {t("table.votes")}
+            </th>
+          </tr>
+        </thead>
 
-      {/* Table */}
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <th className="px-4 py-3">#</th>
-              <th className="px-4 py-3">Candidate</th>
-              <th className="px-4 py-3 text-right">Votes</th>
-              <th className="px-4 py-3 text-right">Share</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {candidates.map((c) => {
-              const share =
-                totalVotes > 0
-                  ? ((c.voteCount / totalVotes) * 100).toFixed(1)
-                  : "0.0";
-              return (
-                <tr
-                  key={c.id}
-                  className="hover:bg-gray-50 transition-colors duration-150"
-                >
-                  <td className="px-4 py-3 text-gray-400 font-mono text-xs">
-                    {c.id + 1}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-gray-800">
-                    {c.name}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-medium text-gray-700">
-                    {c.voteCount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="inline-flex items-center gap-1.5 text-gray-600">
-                      {/* Mini bar */}
-                      <span className="relative w-20 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                        <span
-                          className="absolute left-0 top-0 h-full rounded-full bg-blue-400 transition-all duration-500"
-                          style={{ width: `${share}%` }}
-                        />
+        <tbody>
+          {candidates.map((candidate) => {
+            const isLeader =
+              candidate.voteCount === highestVote && highestVote > 0;
+
+            return (
+              <tr
+                key={candidate.id}
+                className={`border-b border-[var(--color-border)]/50 transition-colors duration-200 hover:bg-[var(--color-border)]/20 ${
+                  isLeader ? "bg-[var(--color-border)]/10" : ""
+                }`}
+              >
+                <td className="px-4 py-4 text-[var(--color-text-secondary)]">
+                  {candidate.id}
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          isLeader ? "bg-[var(--color-text-primary)]" : "bg-[var(--color-text-secondary)]/30"
+                        }`}
+                      />
+                      <span className="font-medium text-[var(--color-text-primary)]">
+                        {candidate.name}
                       </span>
-                      <span className="text-xs w-10 text-right">{share}%</span>
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-gray-200 bg-gray-50">
-              <td colSpan={2} className="px-4 py-2.5 text-xs text-gray-500 font-medium">
-                Total
-              </td>
-              <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-700 text-sm">
-                {totalVotes.toLocaleString()}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+                      {isLeader && (
+                        <span className="rounded-full border border-[var(--color-text-primary)]/20 px-2 py-0.5 text-xs text-[var(--color-text-primary)]">
+                          {t("badge.leading")}
+                        </span>
+                      )}
+                    </div>
+                    {candidate.bio && (
+                      <div className="text-xs text-[var(--color-text-secondary)] pl-5 line-clamp-2">
+                        {candidate.bio}
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-4 text-right font-medium text-[var(--color-text-primary)] tabular-nums">
+                  {candidate.voteCount.toLocaleString()}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+
+        <tfoot>
+          <tr>
+            <td
+              colSpan={2}
+              className="px-4 py-4 text-[var(--color-text-secondary)] font-medium"
+            >
+              {t("table.totalVotes")}
+            </td>
+            <td className="px-4 py-4 text-right font-semibold text-[var(--color-text-primary)] tabular-nums">
+              {candidates
+                .reduce((sum, c) => sum + c.voteCount, 0)
+                .toLocaleString()}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }
