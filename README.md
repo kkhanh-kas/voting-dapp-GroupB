@@ -30,17 +30,14 @@ graph TD
 ## Cấu trúc dự án 
 ```
 voting-dapp-GroupB/
-├── .env
-├── .env.example
+├── .env.example                         (mẫu biến môi trường cho deploy testnet)
 ├── .gitignore
 ├── contracts/
 │   └── Voting.sol
 ├── frontend/
-│   ├── .env.local
-│   ├── next-env.d.ts
+│   ├── .env.local                       (địa chỉ contract local cho frontend)
 │   ├── next.config.ts
 │   ├── package.json
-│   ├── package-lock.json
 │   ├── postcss.config.js
 │   ├── tsconfig.json
 │   ├── app/
@@ -52,24 +49,26 @@ voting-dapp-GroupB/
 │   ├── components/
 │   │   ├── Header.tsx                  (Client Component, hiển thị ví và navbar)
 │   │   ├── CandidateTable.tsx          (bảng danh sách ứng viên)
+│   │   ├── Providers.tsx               (wrapper context/provider phía client)
 │   │   ├── VoteChart.tsx               (biểu đồ kết quả real-time)
 │   │   ├── VotingStatus.tsx            (hiển thị trạng thái bầu cử)
 │   │   └── ui/
 │   │       ├── Spinner.tsx             (loading indicator)
 │   │       └── Toast.tsx               (thông báo lỗi và thành công)
 │   ├── lib/
-│   │   └── contract.ts                 (ABI và khởi tạo Ethers.js)
+│   │   ├── contract.ts                 (ABI và khởi tạo Ethers.js)
+│   │   └── i18n.ts                     (hàm/chuỗi hỗ trợ đa ngôn ngữ)
 │   ├── types/
 │   │   └── ethereum.d.ts               (khai báo kiểu cho window.ethereum)
 │   └── public/
 ├── hardhat.config.js
 ├── package.json
-├── package-lock.json
 ├── README.md
 ├── scripts/
 │   └── deploy.js
 ├── test/
 │   └── Voting.test.js
+└── .env                                 (biến môi trường local, không commit)
 ```
 
 ---
