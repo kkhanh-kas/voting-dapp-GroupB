@@ -165,7 +165,7 @@ export default function VoterPage() {
       setVoting(true);
       const contract: any = await getContract(true);
       const tx = await contract.vote(selectedId);
-      await tx.wait();
+      await tx.wait(); // Wait for the block to be mined.
 
       setHasVoted(true);
       showToast("Your vote has been submitted!", "success");
@@ -173,8 +173,13 @@ export default function VoterPage() {
     } catch (err: any) {
       let msg = "Failed to submit vote";
 
+      // Error handling
       if (err.code === "ACTION_REJECTED" || err.code === 4001) {
         msg = "Transaction rejected by user";
+      } else if (err.code === "INSUFFICIENT_FUNDS" || err.message?.includes("insufficient funds")) {
+        msg = "Insufficient funds for gas";
+      } else if (err.message?.includes("Already voted") || err.reason?.includes("Already voted")) {
+        msg = "You have already voted";
       } else if (err.reason) {
         msg = err.reason;
       }
@@ -187,7 +192,10 @@ export default function VoterPage() {
 
   /* Connect wallet */
   const connectWallet = async () => {
-    if (typeof window.ethereum === "undefined") return;
+    if (typeof window.ethereum === "undefined") {
+      showToast("Please install MetaMask", "error");
+      return;
+    }
 
     try {
       const accounts: string[] = await window.ethereum.request({
@@ -203,6 +211,7 @@ export default function VoterPage() {
 
   if (!mounted) return null;
 
+  // MetaMask is not installed show error message.
   if (typeof window.ethereum === "undefined") {
     return (
       <div className="mx-auto max-w-xl mt-20 rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-12 text-center shadow-sm">
@@ -351,8 +360,14 @@ export default function VoterPage() {
             <button
               onClick={handleVote}
               disabled={voting || !selectedId}
-              className="w-full sm:w-auto rounded-xl bg-[var(--color-text-primary)] px-8 py-3 text-sm font-medium text-[var(--color-bg-main)] transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-[var(--color-text-primary)] px-8 py-3 text-sm font-medium text-[var(--color-bg-main)] transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
             >
+              {voting && (
+                <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
               {voting ? t("btn.submitting") : t("btn.submitVote")}
             </button>
           </div>
