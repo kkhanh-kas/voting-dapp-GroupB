@@ -9,7 +9,9 @@
 | 3 | Nguyễn Phước Tình |
 | 4 | Lưu Mỹ Khánh |
 | 5 | Nguyễn Tấn Phát |
-| 6 | Huỳnh Hoài Nam |---
+| 6 | Huỳnh Hoài Nam |
+
+---
 
 ## Kiến trúc hệ thống
 
@@ -109,9 +111,9 @@ Truy cập tại `/admin` (Chỉ dành cho Owner):
 - **Cài đặt thời gian:** Chọn `startTime` và `endTime` -> Lưu giá trị timestamp vào contract.
 
 ### 6. Triển khai (Deployment)
-1. Biên dịch và đẩy bytecode lên mạng **Sepolia**.
-2. Nhận địa chỉ contract và cập nhật vào file `.env`.
-3. Cấu hình ABI trong `frontend/lib/contract.ts`.
+1. Biên dịch và đẩy bytecode lên mạng **Sepolia** (chi tiết từng bước ở mục **Hướng dẫn deploy và test trên Sepolia (testnet)** trong README).
+2. Nhận địa chỉ contract và cập nhật `frontend/.env.local` (`NEXT_PUBLIC_CONTRACT_ADDRESS`, `NEXT_PUBLIC_CHAIN_ID`).
+3. ABI cho frontend nằm trong `frontend/lib/contract.ts` (sau khi đổi contract, đồng bộ ABI nếu có thay đổi Solidity).
 
 ### 7. Hướng dẫn deploy và test trên Local (Hardhat)
 
@@ -190,6 +192,116 @@ Lệnh này chạy toàn bộ test trong `test/Voting.test.js`.
 - **`Another next dev server is already running`:** tắt tiến trình Next.js cũ rồi chạy lại.
 
 > **Lưu ý quan trọng:** Mỗi lần restart Hardhat node, trạng thái chain bị reset. Phải deploy lại contract, cập nhật địa chỉ mới trong `.env.local`, rồi khởi động lại frontend.
+
+---
+
+## Hướng dẫn deploy và test trên Sepolia (testnet)
+
+Phần này mô tả cách đưa smart contract lên mạng **Sepolia**, cấu hình frontend và kiểm tra bằng MetaMask. Thư mục làm việc mặc định: gốc project `voting-dapp-GroupB` (đã chạy `npm install` ở root và trong `frontend` như phần local phía trên).
+
+### Bước 1 — Lấy Sepolia RPC URL
+
+1. Vào [Alchemy](https://www.alchemy.com), tạo tài khoản miễn phí (nếu chưa có).
+2. Tạo app mới với cấu hình:
+   - **Chain:** Ethereum
+   - **Network:** Ethereum Sepolia
+3. Sau khi tạo xong, mở app và copy **HTTPS URL** dạng:
+
+   `https://eth-sepolia.g.alchemy.com/v2/...`
+
+   (Có thể dùng provider khác như Infura; URL Sepolia hợp lệ là được.)
+
+### Bước 2 — Lấy private key từ MetaMask
+
+1. Mở MetaMask, chọn tài khoản cần dùng để deploy.
+2. Vào **Account details** (hoặc menu tài khoản), chọn **Show private key**, nhập mật khẩu ví, rồi copy key.
+
+**Cảnh báo bảo mật:** Chỉ dùng **ví riêng cho học / testnet**, không dùng ví chứa tài sản thật. Không commit file `.env` hoặc chia sẻ private key.
+
+### Bước 3 — Điền file `.env` ở root project
+
+Tại thư mục gốc (cùng cấp với `hardhat.config.js`), tạo file `.env` nếu chưa có (có thể copy từ `.env.example` rồi sửa):
+
+```env
+PRIVATE_KEY=private_key_vừa_copy
+SEPOLIA_RPC_URL=https_url_từ_alchemy
+```
+
+- Không thêm dấu ngoặc kép trừ khi tool của bạn yêu cầu; private key thường là chuỗi hex dài bắt đầu bằng `0x`.
+
+### Bước 4 — Lấy Sepolia ETH miễn phí (gas testnet)
+
+1. Copy **địa chỉ ví** MetaMask (public address) sẽ dùng để deploy và tương tác.
+2. Dán địa chỉ vào một trong các faucet (tuỳ faucet còn hoạt động):
+   - [sepoliafaucet.com](https://sepoliafaucet.com)
+   - [Google Cloud Sepolia Faucet](https://faucet.google.com/faucet/sepolia)
+3. Chờ vài phút, kiểm tra lại số dư Sepolia ETH trên MetaMask.
+
+### Bước 5 — Kiểm tra `hardhat.config.js`
+
+Đảm bảo trong `module.exports` có mạng `sepolia` trỏ tới biến môi trường (file trong repo đã cấu hình sẵn dạng tương đương sau):
+
+```javascript
+networks: {
+  sepolia: {
+    url: process.env.SEPOLIA_RPC_URL || "",
+    accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+  },
+},
+```
+
+Nếu thiếu `PRIVATE_KEY` hoặc `SEPOLIA_RPC_URL`, mảng `accounts` có thể rỗng và deploy sẽ lỗi.
+
+### Bước 6 — Biên dịch contract
+
+Tại thư mục gốc project:
+
+```powershell
+npx hardhat compile
+```
+
+Kỳ vọng: biên dịch thành công, không báo lỗi Solidity. Nếu có lỗi, sửa contract rồi chạy lại trước khi deploy.
+
+### Bước 7 — Deploy lên Sepolia
+
+```powershell
+npx hardhat run scripts/deploy.js --network sepolia
+```
+
+- Lệnh có thể mất khoảng **15–30 giây** (tuỳ RPC và mempool).
+- Script in ra một dòng dạng: `Voting contract deployed to: 0x...` — **copy nguyên địa chỉ contract** (chuỗi `0x` + 40 ký tự hex) để dùng ở bước sau.
+
+### Bước 8 — Cập nhật frontend
+
+Mở hoặc tạo file `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x_dia_chi_contract_vua_deploy
+NEXT_PUBLIC_CHAIN_ID=11155111
+```
+
+- `11155111` là Chain ID chuẩn của **Sepolia**.
+- Sau khi sửa `.env.local`, cần **khởi động lại** `npm run dev` để Next.js đọc biến mới.
+
+### Bước 9 — Kiểm tra trên Etherscan
+
+1. Mở [Sepolia Etherscan](https://sepolia.etherscan.io).
+2. Dán địa chỉ contract vào ô tìm kiếm.
+3. Nếu thấy trang contract (bytecode, giao dịch deploy), nghĩa là deploy đã lên chain thành công.
+
+### Bước 10 — Chạy frontend và test thủ công
+
+```powershell
+cd frontend
+npm run dev
+```
+
+1. Mở trình duyệt tại [http://localhost:3000](http://localhost:3000).
+2. Kết nối MetaMask, **chuyển mạng sang Sepolia** (cùng testnet với contract).
+3. Thử luồng người bầu: xem danh sách ứng viên, bỏ phiếu (nếu đang trong thời gian bầu cử trên contract).
+4. Trang admin: [http://localhost:3000/admin](http://localhost:3000/admin) — chỉ ví **owner** (địa chỉ deploy contract) mới vào được; cần có Sepolia ETH để gửi giao dịch.
+
+**Gợi ý xử lý sự cố:** Sai mạng MetaMask, sai `NEXT_PUBLIC_CONTRACT_ADDRESS`, hoặc hết Sepolia ETH đều là nguyên nhân thường gặp khi UI không đọc được contract hoặc giao dịch thất bại.
 
 ---
 
