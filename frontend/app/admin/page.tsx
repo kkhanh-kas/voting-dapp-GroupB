@@ -6,6 +6,7 @@ import { getContract } from "@/lib/contract";
 import Spinner from "@/components/ui/Spinner";
 import Toast from "@/components/ui/Toast";
 import { useLang } from "@/components/Providers";
+import { Pencil, Trash2 } from "lucide-react";
 
 // ─── Domain Types ─────────────────────────────────────────────────────────────
 
@@ -25,21 +26,24 @@ type AuthState = "loading" | "unauthorized" | "authorized";
 
 // ─── Validation Service ───────────────────────────────────────────────────────
 
+type T = (key: any) => string;
+
 class AdminValidator {
-  static candidateName(name: string): string | null {
+  static candidateName(name: string, t: T): string | null {
     const trimmed = name.trim();
-    if (!trimmed) return "Candidate name is required";
-    if (trimmed.length < 2) return "Name must be at least 2 characters";
-    if (trimmed.length > 100) return "Name must be at most 100 characters";
+    if (!trimmed) return t("validation.nameRequired");
+    if (trimmed.length < 2) return t("validation.nameMinLength");
+    if (trimmed.length > 100) return t("validation.nameMaxLength");
     return null;
   }
 
   static votingPeriod(
     startInput: string,
-    endInput: string
+    endInput: string,
+    t: T
   ): { startUnix: number; endUnix: number } | { error: string } {
     if (!startInput || !endInput) {
-      return { error: "Both start and end time are required" };
+      return { error: t("validation.bothTimesRequired") };
     }
 
     const startUnix = Math.floor(new Date(startInput).getTime() / 1000);
@@ -47,16 +51,16 @@ class AdminValidator {
     const nowUnix = Math.floor(Date.now() / 1000);
 
     if (isNaN(startUnix) || isNaN(endUnix)) {
-      return { error: "Invalid date format" };
+      return { error: t("validation.invalidDate") };
     }
     if (startUnix < nowUnix - 60) {
-      return { error: "Start time cannot be in the past" };
+      return { error: t("validation.startInPast") };
     }
     if (endUnix <= startUnix) {
-      return { error: "End time must be after start time" };
+      return { error: t("validation.endBeforeStart") };
     }
     if (endUnix - startUnix < 60) {
-      return { error: "Voting period must be at least 1 minute" };
+      return { error: t("validation.periodTooShort") };
     }
 
     return { startUnix, endUnix };
@@ -67,7 +71,8 @@ class AdminValidator {
 
 class AdminContractService {
   static async fetchOwnerAndCandidates(
-    showToast: (msg: string, type: "success" | "error") => void
+    showToast: (msg: string, type: "success" | "error") => void,
+    t: T
   ): Promise<{ owner: string; candidates: Candidate[] } | null> {
     try {
       const contract: any = await getContract();
@@ -91,17 +96,17 @@ class AdminContractService {
     } catch (err: any) {
       const msg = err?.message?.includes("Wrong network")
         ? err.message
-        : "Failed to load admin data";
+        : t("error.loadAdminData");
       showToast(msg, "error");
       return null;
     }
   }
 
-  static resolveContractError(err: any): string {
+  static resolveContractError(err: any, t: T): string {
     if (err.code === "ACTION_REJECTED" || err.code === 4001) {
-      return "Transaction rejected by user";
+      return t("error.txRejected");
     }
-    return err.reason ?? err.message ?? "An unexpected error occurred";
+    return err.reason ?? err.message ?? t("error.unexpected");
   }
 
   static async addCandidate(name: string, bio: string): Promise<void> {
@@ -186,13 +191,11 @@ function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    // Validate
-    const nameErr = AdminValidator.candidateName(name);
+    const nameErr = AdminValidator.candidateName(name, t);
     setNameError(nameErr);
     if (nameErr) return;
 
-    // Confirm
-    if (!confirm(`Are you sure you want to add "${name.trim()}" as a new candidate?`)) return;
+    if (!confirm(`${t("confirm.addCandidate")}\n\n"${name.trim()}"`)) return;
 
     try {
       setLoading(true);
@@ -200,10 +203,10 @@ function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
       setName("");
       setBio("");
       setNameError(null);
-      showToast(`Candidate "${name.trim()}" added successfully`, "success");
+      showToast(t("toast.candidateAdded"), "success");
       await onSuccess();
     } catch (err: any) {
-      showToast(AdminContractService.resolveContractError(err), "error");
+      showToast(AdminContractService.resolveContractError(err, t), "error");
     } finally {
       setLoading(false);
     }
@@ -218,7 +221,7 @@ function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
           value={name}
           onChange={(e) => {
             setName(e.target.value);
-            if (nameError) setNameError(AdminValidator.candidateName(e.target.value));
+            if (nameError) setNameError(AdminValidator.candidateName(e.target.value, t));
           }}
           className={`w-full border rounded-xl px-4 py-3 text-[var(--color-text-primary)] bg-[var(--color-bg-main)] focus:outline-none transition-colors ${
             nameError
@@ -245,9 +248,7 @@ function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
           disabled={loading}
           className="bg-[var(--color-text-primary)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--color-bg-main)] font-medium px-8 py-3 rounded-xl transition-opacity whitespace-nowrap flex items-center gap-2"
         >
-          {loading && (
-            <span className="w-4 h-4 border-2 border-[var(--color-bg-main)]/40 border-t-[var(--color-bg-main)] rounded-full animate-spin" />
-          )}
+          {loading && <Spinner size="sm" />}
           {loading ? t("btn.adding") : t("btn.add")}
         </button>
       </div>
@@ -269,8 +270,7 @@ function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    // Validate
-    const result = AdminValidator.votingPeriod(startInput, endInput);
+    const result = AdminValidator.votingPeriod(startInput, endInput, t);
     if ("error" in result) {
       setPeriodError(result.error);
       return;
@@ -282,16 +282,16 @@ function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
     const startStr = new Date(startUnix * 1000).toLocaleString();
     const endStr = new Date(endUnix * 1000).toLocaleString();
 
-    if (!confirm(`Set voting period?\n\nStart: ${startStr}\nEnd: ${endStr}`)) return;
+    if (!confirm(`${t("confirm.setVotingPeriod")}\n\n${startStr} — ${endStr}`)) return;
 
     try {
       setLoading(true);
       await AdminContractService.setVotingPeriod(startUnix, endUnix);
-      showToast("Voting period updated successfully", "success");
+      showToast(t("toast.votingPeriodUpdated"), "success");
       setStartInput("");
       setEndInput("");
     } catch (err: any) {
-      showToast(AdminContractService.resolveContractError(err), "error");
+      showToast(AdminContractService.resolveContractError(err, t), "error");
     } finally {
       setLoading(false);
     }
@@ -299,7 +299,7 @@ function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
 
   const validateOnChange = (start: string, end: string) => {
     if (periodError) {
-      const result = AdminValidator.votingPeriod(start, end);
+      const result = AdminValidator.votingPeriod(start, end, t);
       setPeriodError("error" in result ? result.error : null);
     }
   };
@@ -354,9 +354,7 @@ function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
         disabled={loading}
         className="w-full sm:w-auto bg-[var(--color-text-primary)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--color-bg-main)] font-medium px-8 py-3 rounded-xl transition-opacity flex items-center gap-2"
       >
-        {loading && (
-          <span className="w-4 h-4 border-2 border-[var(--color-bg-main)]/40 border-t-[var(--color-bg-main)] rounded-full animate-spin" />
-        )}
+        {loading && <Spinner size="sm" />}
         {loading ? t("btn.updating") : t("btn.setPeriod")}
       </button>
     </div>
@@ -388,13 +386,13 @@ function CandidateRow({
   const [deleting, setDeleting] = useState(false);
 
   const handleUpdate = async () => {
-    const nameErr = AdminValidator.candidateName(editName);
+    const nameErr = AdminValidator.candidateName(editName, t);
     setNameError(nameErr);
     if (nameErr) return;
 
     if (
       !confirm(
-        `Are you sure you want to update candidate #${candidate.id} "${candidate.name}"?\n\nNew name: ${editName.trim()}`
+        `${t("confirm.updateCandidate")}\n\n"${editName.trim()}"`
       )
     )
       return;
@@ -407,7 +405,7 @@ function CandidateRow({
       setNameError(null);
       await onUpdated();
     } catch (err: any) {
-      showToast(AdminContractService.resolveContractError(err), "error");
+      showToast(AdminContractService.resolveContractError(err, t), "error");
     } finally {
       setUpdating(false);
     }
@@ -416,7 +414,7 @@ function CandidateRow({
   const handleDelete = async () => {
     if (
       !confirm(
-        `${t("msg.confirmDelete")}\n\nCandidate: "${candidate.name}" (ID: ${candidate.id})`
+        `${t("msg.confirmDelete")}\n\n${t("label.candidate")}: "${candidate.name}" (ID: ${candidate.id})`
       )
     )
       return;
@@ -427,7 +425,7 @@ function CandidateRow({
       showToast(t("msg.candidateDeleted"), "success");
       await onDeleted();
     } catch (err: any) {
-      showToast(AdminContractService.resolveContractError(err), "error");
+      showToast(AdminContractService.resolveContractError(err, t), "error");
     } finally {
       setDeleting(false);
     }
@@ -455,7 +453,7 @@ function CandidateRow({
                 value={editName}
                 onChange={(e) => {
                   setEditName(e.target.value);
-                  if (nameError) setNameError(AdminValidator.candidateName(e.target.value));
+                  if (nameError) setNameError(AdminValidator.candidateName(e.target.value, t));
                 }}
                 className={`w-full border rounded-lg px-3 py-2 text-sm text-[var(--color-text-primary)] bg-[var(--color-bg-main)] focus:outline-none transition-colors ${
                   nameError
@@ -497,9 +495,7 @@ function CandidateRow({
               disabled={updating}
               className="text-xs font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-40 transition-colors flex items-center gap-1"
             >
-              {updating && (
-                <span className="w-3 h-3 border-[1.5px] border-emerald-400/40 border-t-emerald-600 rounded-full animate-spin" />
-              )}
+              {updating && <Spinner size="sm" />}
               {t("btn.save")}
             </button>
             <button
@@ -511,23 +507,22 @@ function CandidateRow({
             </button>
           </div>
         ) : (
-          <div className="flex justify-end gap-3 pt-1">
+          <div className="flex justify-end gap-1 pt-1">
             <button
               onClick={() => setEditing(true)}
               disabled={deleting}
-              className="text-xs font-medium text-blue-600 hover:text-blue-700 disabled:opacity-40 transition-colors"
+              aria-label={t("btn.edit")}
+              className="p-1.5 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-border)]/30 disabled:opacity-40 transition-colors"
             >
-              {t("btn.edit")}
+              <Pencil size={15} strokeWidth={1.5} />
             </button>
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-40 transition-colors flex items-center gap-1"
+              aria-label={t("btn.delete")}
+              className="p-1.5 rounded-lg text-[var(--color-text-secondary)] hover:text-red-500 disabled:opacity-40 transition-colors"
             >
-              {deleting && (
-                <span className="w-3 h-3 border-[1.5px] border-red-300/40 border-t-red-500 rounded-full animate-spin" />
-              )}
-              {deleting ? "…" : t("btn.delete")}
+              {deleting ? <Spinner size="sm" /> : <Trash2 size={15} strokeWidth={1.5} />}
             </button>
           </div>
         )}
@@ -558,7 +553,7 @@ function CandidateManager({ candidates, t, onRefresh, showToast }: CandidateMana
               {t("table.name")}
             </th>
             <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider w-32">
-              Actions
+              {t("label.actions")}
             </th>
           </tr>
         </thead>
@@ -670,13 +665,13 @@ export default function AdminPage() {
 
   // Load contract data
   const loadData = useCallback(async () => {
-    const result = await AdminContractService.fetchOwnerAndCandidates(showToast);
+    const result = await AdminContractService.fetchOwnerAndCandidates(showToast, t);
     if (result) {
       setOwner(result.owner);
       setCandidates(result.candidates);
     }
     setDataLoading(false);
-  }, [showToast]);
+  }, [showToast, t]);
 
   useEffect(() => {
     if (!mounted || typeof window.ethereum === "undefined") {

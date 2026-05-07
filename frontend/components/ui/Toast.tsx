@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect } from "react";
-import { CheckCircle2, AlertCircle, X } from "lucide-react";
+import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 
 interface ToastProps {
   message: string;
-  type?: "success" | "error";
+  type?: "success" | "error" | "info";
   onClose?: () => void;
   duration?: number;
 }
+
+const toastStyles = {
+  success: { border: "border-emerald-500/20", icon: <CheckCircle2 className="text-emerald-500" size={18} strokeWidth={2} /> },
+  error: { border: "border-red-500/20", icon: <AlertCircle className="text-red-500" size={18} strokeWidth={2} /> },
+  info: { border: "border-amber-500/20", icon: <Info className="text-amber-500" size={18} strokeWidth={2} /> },
+};
 
 export default function Toast({
   message,
@@ -23,20 +29,14 @@ export default function Toast({
     return () => clearTimeout(timer);
   }, [onClose, duration]);
 
+  const style = toastStyles[type];
+
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3.5 text-sm font-medium shadow-sm border transition-all ${
-        type === "success" 
-          ? "bg-[var(--color-card)] border-emerald-500/20 text-[var(--color-text-primary)]" 
-          : "bg-[var(--color-card)] border-red-500/20 text-[var(--color-text-primary)]"
-      }`}
+      className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3.5 text-sm font-medium shadow-sm border transition-all bg-[var(--color-card)] text-[var(--color-text-primary)] ${style.border}`}
       role="alert"
     >
-      {type === "success" ? (
-        <CheckCircle2 className="text-emerald-500" size={18} strokeWidth={2} />
-      ) : (
-        <AlertCircle className="text-red-500" size={18} strokeWidth={2} />
-      )}
+      {style.icon}
       
       <span>{message}</span>
 

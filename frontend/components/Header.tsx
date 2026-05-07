@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme, useLang } from "@/components/Providers";
 import { Sun, Moon, Globe, ChevronDown, Wallet, LogOut } from "lucide-react";
-import { Lang } from "@/lib/i18n";
 import { getContract } from "@/lib/contract";
+import Toast from "@/components/ui/Toast";
 
 function truncateAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -18,11 +18,19 @@ export default function Header() {
   const [error, setError] = useState<string | null>(null);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isWalletOpen, setIsWalletOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { lang, setLang, t } = useLang();
   const langRef = useRef<HTMLDivElement>(null);
   const walletRef = useRef<HTMLDivElement>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string, type: "success" | "error" | "info") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const connectWallet = async () => {
     if (typeof window.ethereum === "undefined") {
@@ -38,14 +46,25 @@ export default function Header() {
       if (accounts.length > 0) {
         setAccount(accounts[0]);
         setError(null);
+
+        try {
+          const contract: any = await getContract();
+          const ownerAddr = await contract.owner();
+          const isAdmin = accounts[0].toLowerCase() === ownerAddr.toLowerCase();
+          setIsOwner(isAdmin);
+          showToast(
+            isAdmin ? t("toast.welcomeAdmin") : t("toast.connectedVoter"),
+            isAdmin ? "info" : "success"
+          );
+        } catch { /* owner check failed silently */ }
       }
     } catch (err: unknown) {
       const e = err as { code?: number; message?: string };
       console.error("Wallet connect error:", e.code, e.message ?? String(err));
       setError(
         e.code === 4001
-          ? "Connection request rejected"
-          : "Failed to connect wallet"
+          ? t("error.connectionRejected")
+          : t("error.connectWallet")
       );
     }
   };
@@ -116,6 +135,7 @@ export default function Header() {
 
   return (
     <header className="border-b border-[var(--color-border)] bg-[var(--color-bg-main)]/80 backdrop-blur-md sticky top-0 z-50">
+      {toast && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast(null)} />}
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-8">
           <Link
@@ -159,7 +179,7 @@ export default function Header() {
               className="flex items-center gap-2 p-2 rounded-xl text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/50 transition-colors text-sm font-medium"
             >
               <Globe size={20} strokeWidth={1.5} />
-              <span className="hidden sm:inline">Language</span>
+              <span className="hidden sm:inline">{t("label.language")}</span>
               <ChevronDown size={16} strokeWidth={1.5} className={`transition-transform ${isLangOpen ? "rotate-180" : ""}`} />
             </button>
 

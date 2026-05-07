@@ -94,7 +94,7 @@ export default function VoteChart({ candidates }: VoteChartProps) {
               color: textColor,
               font: {
                 family: "Inter, sans-serif",
-                weight: "500",
+                weight: 500,
               },
             },
             border: {

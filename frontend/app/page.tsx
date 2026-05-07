@@ -9,6 +9,7 @@ import Spinner from "@/components/ui/Spinner";
 import Toast from "@/components/ui/Toast";
 import { useLang } from "@/components/Providers";
 import { translateBio } from "@/lib/i18n";
+import { Check } from "lucide-react";
 
 interface Candidate {
   id: number;
@@ -34,14 +35,14 @@ export default function VoterPage() {
   const [voting, setVoting] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
-    type: "success" | "error";
+    type: "success" | "error" | "info";
   } | null>(null);
 
   const { t, lang } = useLang();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback(
-    (message: string, type: "success" | "error") => {
+    (message: string, type: "success" | "error" | "info") => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
       setToast({ message, type });
       toastTimer.current = setTimeout(() => setToast(null), 4000);
@@ -108,7 +109,7 @@ export default function VoterPage() {
       console.error("Failed to load contract data:", err);
       const msg = err?.message?.includes("Wrong network")
         ? err.message
-        : "Failed to load contract data";
+        : t("error.loadContractData");
       showToast(msg, "error");
     } finally {
       setLoading(false);
@@ -139,7 +140,7 @@ export default function VoterPage() {
         handler = async () => {
           if (!active) return;
           await loadData();
-          showToast("A new vote has been cast!", "success");
+          showToast(t("toast.newVote"), "success");
         };
 
         if (active) contract.on("votedEvent", handler);
@@ -157,7 +158,7 @@ export default function VoterPage() {
   /* Vote handler */
   const handleVote = async () => {
     if (!selectedId) {
-      showToast("Please select a candidate", "error");
+      showToast(t("toast.selectCandidate"), "error");
       return;
     }
 
@@ -168,18 +169,17 @@ export default function VoterPage() {
       await tx.wait(); // Wait for the block to be mined.
 
       setHasVoted(true);
-      showToast("Your vote has been submitted!", "success");
+      showToast(t("toast.voteSubmitted"), "success");
       await loadData();
     } catch (err: any) {
-      let msg = "Failed to submit vote";
+      let msg = t("error.submitVote");
 
-      // Error handling
       if (err.code === "ACTION_REJECTED" || err.code === 4001) {
-        msg = "Transaction rejected by user";
+        msg = t("error.txRejected");
       } else if (err.code === "INSUFFICIENT_FUNDS" || err.message?.includes("insufficient funds")) {
-        msg = "Insufficient funds for gas";
+        msg = t("error.insufficientFunds");
       } else if (err.message?.includes("Already voted") || err.reason?.includes("Already voted")) {
-        msg = "You have already voted";
+        msg = t("error.alreadyVoted");
       } else if (err.reason) {
         msg = err.reason;
       }
@@ -193,7 +193,7 @@ export default function VoterPage() {
   /* Connect wallet */
   const connectWallet = async () => {
     if (typeof window.ethereum === "undefined") {
-      showToast("Please install MetaMask", "error");
+      showToast(t("msg.installMetamask"), "error");
       return;
     }
 
@@ -201,9 +201,20 @@ export default function VoterPage() {
       const accounts: string[] = await window.ethereum.request({
         method: "eth_requestAccounts",
       });
-      if (accounts.length > 0) setAccount(accounts[0]);
+      if (accounts.length > 0) {
+        setAccount(accounts[0]);
+        try {
+          const contract: any = await getContract();
+          const ownerAddr = await contract.owner();
+          const isAdmin = accounts[0].toLowerCase() === ownerAddr.toLowerCase();
+          showToast(
+            isAdmin ? t("toast.welcomeAdmin") : t("toast.connectedVoter"),
+            isAdmin ? "info" : "success"
+          );
+        } catch { /* owner check failed silently */ }
+      }
     } catch {
-      showToast("Failed to connect wallet", "error");
+      showToast(t("error.connectWallet"), "error");
     }
   };
 
@@ -292,8 +303,9 @@ export default function VoterPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {candidates.map((c, idx) => {
               const percentage = totalVotes > 0 ? (c.voteCount / totalVotes) * 100 : 0;
-              
-              // Array of different scribble faces
+              const isSelected = selectedId === c.id;
+              const hasSomeSelection = selectedId > 0;
+
               const faces = [
                 <path key="1" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-3.5-7.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm7 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm-6.5 3.5c1 1.5 5 1.5 6 0" strokeLinecap="round" strokeLinejoin="round"/>,
                 <path key="2" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-4-8h2m4 0h2m-5 4v1" strokeLinecap="round" strokeLinejoin="round"/>,
@@ -305,18 +317,29 @@ export default function VoterPage() {
               return (
                 <div
                   key={c.id}
-                  className="relative rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-6 transition-all duration-200 hover:border-[var(--color-text-secondary)] hover:shadow-sm"
+                  className={`relative rounded-2xl border bg-[var(--color-card)] p-6 transition-all duration-200 ${
+                    isSelected
+                      ? "border-[var(--color-text-primary)] shadow-sm"
+                      : hasSomeSelection
+                        ? "border-[var(--color-border)] opacity-50"
+                        : "border-[var(--color-border)] hover:border-[var(--color-text-secondary)] hover:shadow-sm"
+                  }`}
                 >
+                  {isSelected && (
+                    <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[var(--color-text-primary)] flex items-center justify-center">
+                      <Check size={14} strokeWidth={2.5} className="text-[var(--color-bg-main)]" />
+                    </div>
+                  )}
+
                   <div className="flex flex-col space-y-4">
                     <div className="flex items-center justify-between">
-                      {/* Scribble SVG Avatar */}
                       <div className="w-12 h-12 rounded-full flex items-center justify-center text-[var(--color-text-secondary)]">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-10 h-10">
                           {face}
                         </svg>
                       </div>
                       
-                      <div className="text-sm text-[var(--color-text-secondary)]">{c.voteCount} votes</div>
+                      <div className="text-sm text-[var(--color-text-secondary)]">{c.voteCount} {t("label.votes")}</div>
                     </div>
                     
                     <div>
@@ -325,7 +348,6 @@ export default function VoterPage() {
                     </div>
                   </div>
 
-                  {/* Thin progress bar */}
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--color-bg-main)] rounded-b-2xl overflow-hidden">
                     <div 
                       className="h-full bg-[var(--color-text-secondary)] transition-all duration-500"
@@ -362,12 +384,7 @@ export default function VoterPage() {
               disabled={voting || !selectedId}
               className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-[var(--color-text-primary)] px-8 py-3 text-sm font-medium text-[var(--color-bg-main)] transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
             >
-              {voting && (
-                <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
+              {voting && <Spinner size="sm" />}
               {voting ? t("btn.submitting") : t("btn.submitVote")}
             </button>
           </div>
