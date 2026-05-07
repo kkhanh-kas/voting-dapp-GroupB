@@ -189,7 +189,7 @@ Lệnh này chạy toàn bộ test trong `test/Voting.test.js`.
 - **Sai địa chỉ contract trên UI:** deploy lại và cập nhật `frontend/.env.local`, sau đó restart frontend.
 - **`Another next dev server is already running`:** tắt tiến trình Next.js cũ rồi chạy lại.
 
-> **Lưu ý quan trọng:** Mỗi lần restart Hardhat node, trạng thái chain bị reset. Bạn phải deploy lại contract, cập nhật địa chỉ mới trong `.env.local`, rồi khởi động lại frontend.
+> **Lưu ý quan trọng:** Mỗi lần restart Hardhat node, trạng thái chain bị reset. Phải deploy lại contract, cập nhật địa chỉ mới trong `.env.local`, rồi khởi động lại frontend.
 
 ---
 
