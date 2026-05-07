@@ -158,3 +158,6 @@ frontend/.env.local
 # Cursor (personal)
 .cursor/
 .cursorignore
+
+# Tasks
+tasks.md
