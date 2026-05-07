@@ -13,6 +13,7 @@ interface Candidate {
   id: number;
   name: string;
   bio: string;
+  // Shown in admin view so owner can see vote distribution before editing/removing.
   voteCount: number;
 }
 
@@ -21,11 +22,31 @@ interface ToastState {
   type: "success" | "error";
 }
 
+// Discriminated union beats two booleans — eliminates the impossible
+// `isLoading && isAuthorized` state and makes render branches exhaustive.
 type AuthState = "loading" | "unauthorized" | "authorized";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+// Long enough to read "Access Denied", short enough not to feel stuck.
+const UNAUTHORIZED_REDIRECT_DELAY_MS = 2000;
+
+const TOAST_DURATION_MS = 4000;
+
+// Accounts for ~1-block latency between Submit click and tx mine time.
+// Without this, a valid startTime≈now gets rejected client-side.
+const PAST_START_GRACE_SECONDS = 60;
+
+// Prevents zero-duration elections from identical start/end timestamps.
+const MIN_VOTING_PERIOD_SECONDS = 60;
 
 // ─── Validation Service ───────────────────────────────────────────────────────
 
+// Pure validation helpers — no side effects, no contract calls.
+// Static class so they can be unit-tested without mounting any component.
 class AdminValidator {
+  // 100-char limit mirrors the Solidity storage constraint.
+  // Catching it here gives instant feedback without burning gas.
   static candidateName(name: string): string | null {
     const trimmed = name.trim();
     if (!trimmed) return "Candidate name is required";
@@ -34,6 +55,9 @@ class AdminValidator {
     return null;
   }
 
+  // Validates a datetime-local pair and converts to Unix timestamps for
+  // `setVotingPeriod(uint256, uint256)`. All rules here mirror on-chain modifiers —
+  // client-side check saves gas on a doomed tx and gives instant UX feedback.
   static votingPeriod(
     startInput: string,
     endInput: string
@@ -49,13 +73,13 @@ class AdminValidator {
     if (isNaN(startUnix) || isNaN(endUnix)) {
       return { error: "Invalid date format" };
     }
-    if (startUnix < nowUnix - 60) {
+    if (startUnix < nowUnix - PAST_START_GRACE_SECONDS) {
       return { error: "Start time cannot be in the past" };
     }
     if (endUnix <= startUnix) {
       return { error: "End time must be after start time" };
     }
-    if (endUnix - startUnix < 60) {
+    if (endUnix - startUnix < MIN_VOTING_PERIOD_SECONDS) {
       return { error: "Voting period must be at least 1 minute" };
     }
 
@@ -65,7 +89,13 @@ class AdminValidator {
 
 // ─── Contract Service ─────────────────────────────────────────────────────────
 
+// Thin facade over admin-only contract writes.
+// Always awaits tx.wait() before resolving so callers re-fetch committed state.
+// Errors are not caught here — callers own the try/catch for loading state.
 class AdminContractService {
+  // Fetches owner + full candidate list in one pass.
+  // Skips empty-name slots — contract soft-deletes by clearing `name`,
+  // so IDs are non-contiguous after deletions.
   static async fetchOwnerAndCandidates(
     showToast: (msg: string, type: "success" | "error") => void
   ): Promise<{ owner: string; candidates: Candidate[] } | null> {
@@ -89,6 +119,8 @@ class AdminContractService {
 
       return { owner, candidates };
     } catch (err: any) {
+      // "Wrong network" is the most common issue — MetaMask pointed at mainnet
+      // instead of local/test chain.
       const msg = err?.message?.includes("Wrong network")
         ? err.message
         : "Failed to load admin data";
@@ -97,6 +129,8 @@ class AdminContractService {
     }
   }
 
+  // Normalizes Ethers.js + MetaMask errors into a display string.
+  // ACTION_REJECTED = Ethers v6; 4001 = legacy EIP-1193 (older MetaMask builds).
   static resolveContractError(err: any): string {
     if (err.code === "ACTION_REJECTED" || err.code === 4001) {
       return "Transaction rejected by user";
@@ -104,12 +138,15 @@ class AdminContractService {
     return err.reason ?? err.message ?? "An unexpected error occurred";
   }
 
+  // getContract(true) requests a signer → MetaMask prompts user to sign.
+  // tx.wait() blocks until included in a block, so subsequent loadData() sees the new row.
   static async addCandidate(name: string, bio: string): Promise<void> {
     const contract: any = await getContract(true);
     const tx = await contract.addCandidate(name.trim(), bio.trim());
     await tx.wait();
   }
 
+  /** Overwrites an existing candidate's `name` and `bio` on-chain. */
   static async updateCandidate(
     id: number,
     name: string,
@@ -120,12 +157,16 @@ class AdminContractService {
     await tx.wait();
   }
 
+  // Soft-delete: clears `name` field on-chain. Vote data stays in the mapping
+  // for audit purposes.
   static async deleteCandidate(id: number): Promise<void> {
     const contract: any = await getContract(true);
     const tx = await contract.deleteCandidate(id);
     await tx.wait();
   }
 
+  // Both values are Unix seconds. block.timestamp can drift ±15s on PoS Ethereum
+  // — that's why PAST_START_GRACE_SECONDS exists in the validator.
   static async setVotingPeriod(
     startUnix: number,
     endUnix: number
@@ -138,17 +179,19 @@ class AdminContractService {
 
 // ─── Confirm Dialog Helper ────────────────────────────────────────────────────
 
+// Named wrapper to avoid accidentally shadowing `window` in SSR/test environments.
 function confirm(message: string): boolean {
   return window.confirm(message);
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Shared UI Primitives ─────────────────────────────────────────────────────
 
 interface SectionCardProps {
   title: string;
   children: React.ReactNode;
 }
 
+/** Consistent card shell used by every admin panel section. */
 function SectionCard({ title, children }: SectionCardProps) {
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-8 shadow-sm space-y-6 transition-colors hover:border-[var(--color-text-secondary)]">
@@ -175,10 +218,14 @@ function FieldError({ message }: FieldErrorProps) {
 
 interface AddCandidateFormProps {
   t: any;
+  /** Called after confirmed tx to re-sync the parent's candidate list. */
   onSuccess: () => Promise<void>;
   showToast: (msg: string, type: "success" | "error") => void;
 }
 
+// Submit flow: validate → confirm → MetaMask sign → tx.wait() → onSuccess()
+// Local `loading` locks the form for the full async lifecycle to prevent
+// duplicate submissions while a tx is in-flight.
 function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
@@ -186,12 +233,10 @@ function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    // Validate
     const nameErr = AdminValidator.candidateName(name);
     setNameError(nameErr);
     if (nameErr) return;
 
-    // Confirm
     if (!confirm(`Are you sure you want to add "${name.trim()}" as a new candidate?`)) return;
 
     try {
@@ -201,6 +246,7 @@ function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
       setBio("");
       setNameError(null);
       showToast(`Candidate "${name.trim()}" added successfully`, "success");
+      // Re-fetch after confirmed tx so the table reflects committed on-chain state.
       await onSuccess();
     } catch (err: any) {
       showToast(AdminContractService.resolveContractError(err), "error");
@@ -218,6 +264,7 @@ function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
           value={name}
           onChange={(e) => {
             setName(e.target.value);
+            // Only re-validate after a failed submit — clears error as input becomes valid.
             if (nameError) setNameError(AdminValidator.candidateName(e.target.value));
           }}
           className={`w-full border rounded-xl px-4 py-3 text-[var(--color-text-primary)] bg-[var(--color-bg-main)] focus:outline-none transition-colors ${
@@ -258,10 +305,14 @@ function AddCandidateForm({ t, onSuccess, showToast }: AddCandidateFormProps) {
 // ─── Voting Period Form ───────────────────────────────────────────────────────
 
 interface VotingPeriodFormProps {
-   t: any;
+  t: any;
   showToast: (msg: string, type: "success" | "error") => void;
 }
 
+// datetime-local gives a local-timezone string; validator converts to UTC Unix
+// seconds. Contract uses block.timestamp (always UTC) so no extra TZ handling needed.
+// Live re-validation only kicks in after a failed submit — avoids marking a
+// half-filled form as invalid mid-typing.
 function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
   const [startInput, setStartInput] = useState("");
   const [endInput, setEndInput] = useState("");
@@ -269,7 +320,6 @@ function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    // Validate
     const result = AdminValidator.votingPeriod(startInput, endInput);
     if ("error" in result) {
       setPeriodError(result.error);
@@ -279,6 +329,7 @@ function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
     setPeriodError(null);
     const { startUnix, endUnix } = result;
 
+    // Show human-readable timestamps in the confirm — this controls election access.
     const startStr = new Date(startUnix * 1000).toLocaleString();
     const endStr = new Date(endUnix * 1000).toLocaleString();
 
@@ -297,6 +348,8 @@ function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
     }
   };
 
+  // Re-runs validation only while an error is visible, so the border clears
+  // as soon as the input becomes valid.
   const validateOnChange = (start: string, end: string) => {
     if (periodError) {
       const result = AdminValidator.votingPeriod(start, end);
@@ -367,12 +420,19 @@ function VotingPeriodForm({ t, showToast }: VotingPeriodFormProps) {
 
 interface CandidateRowProps {
   candidate: Candidate;
-    t: any;
+  t: any;
+  /** Triggered after confirmed update tx — parent re-fetches. */
   onUpdated: () => Promise<void>;
+  /** Triggered after confirmed delete tx — parent re-fetches. */
   onDeleted: () => Promise<void>;
   showToast: (msg: string, type: "success" | "error") => void;
 }
 
+// Edit state is row-local — toggling one row doesn't affect siblings.
+// `updating` and `deleting` are separate so each action button has its own
+// loading indicator and neither blocks the other.
+// On cancel, fields reset to current props (last known on-chain values),
+// not to the unsaved draft — guards against a background re-fetch mid-edit.
 function CandidateRow({
   candidate,
   t,
@@ -425,6 +485,7 @@ function CandidateRow({
       setDeleting(true);
       await AdminContractService.deleteCandidate(candidate.id);
       showToast(t("msg.candidateDeleted"), "success");
+      // Parent unmounts this row after re-fetch — no further local state updates.
       await onDeleted();
     } catch (err: any) {
       showToast(AdminContractService.resolveContractError(err), "error");
@@ -433,6 +494,7 @@ function CandidateRow({
     }
   };
 
+  /** Resets draft fields to last known on-chain values from props. */
   const handleCancelEdit = () => {
     setEditing(false);
     setEditName(candidate.name);
@@ -541,6 +603,7 @@ function CandidateRow({
 interface CandidateManagerProps {
   candidates: Candidate[];
   t: any;
+  /** Passed to each row — re-fetches the full list after any mutation. */
   onRefresh: () => Promise<void>;
   showToast: (msg: string, type: "success" | "error") => void;
 }
@@ -592,6 +655,8 @@ function CandidateManager({ candidates, t, onRefresh, showToast }: CandidateMana
 
 // ─── Gate Views ───────────────────────────────────────────────────────────────
 
+// Covers four cases: no MetaMask, not connected, unauthorized address, redirect window.
+// `error` variant = security boundary (wrong account); `default` = missing prerequisite.
 function GateView({
   title,
   message,
@@ -627,6 +692,15 @@ function GateView({
 
 // ─── Main Admin Page ──────────────────────────────────────────────────────────
 
+// Owner-only admin panel. Auth flow:
+// 1. `mounted` gate defers window.ethereum access to client (SSR safety).
+// 2. `loadData` fetches contract owner + candidates; `dataLoading` tracks the flight.
+// 3. Separate effect compares wallet vs owner once both settle → sets authState.
+// 4. Spinner held until both resolve — prevents auth flash between state updates.
+// 5. Unauthorized address triggers delayed redirect (readable "Access Denied").
+//
+// `loadData` is the single source of truth for candidate list.
+// Every mutating action calls it after tx confirmation.
 export default function AdminPage() {
   const router = useRouter();
   const { t } = useLang();
@@ -641,16 +715,27 @@ export default function AdminPage() {
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Stable ref so child components don't re-render when parent updates.
+  // Cancels any pending dismiss before scheduling the new one.
   const showToast = useCallback((message: string, type: "success" | "error") => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ message, type });
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_DURATION_MS);
   }, []);
 
-  // SSR guard
+  // Prevent setState on unmounted component (React dev warning).
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
+  // Defer to client before touching `window` — component is "use client" but
+  // still runs on the server during initial HTML render in App Router.
   useEffect(() => { setMounted(true); }, []);
 
-  // Wallet detection
+  // eth_accounts is silent (no popup); eth_requestAccounts would prompt the user.
+  // Subscribes to account switches and cleans up on unmount to avoid stale setState.
   useEffect(() => {
     if (!mounted || typeof window.ethereum === "undefined") return;
 
@@ -668,7 +753,8 @@ export default function AdminPage() {
     return () => { window.ethereum?.removeListener("accountsChanged", handler); };
   }, [mounted]);
 
-  // Load contract data
+  // showToast is stable (empty-dep useCallback), safe to include in deps
+  // without causing spurious re-fetches.
   const loadData = useCallback(async () => {
     const result = await AdminContractService.fetchOwnerAndCandidates(showToast);
     if (result) {
@@ -686,7 +772,11 @@ export default function AdminPage() {
     loadData();
   }, [mounted, loadData]);
 
-  // Authorization: runs only after BOTH account and owner are resolved
+  // Normalize checksum casing before comparing addresses (EIP-55).
+  // Depends on dataLoading so the effect re-runs once the fetch settles —
+  // handles the race where account arrives before the contract fetch completes.
+  // Cleanup cancels the redirect if the user reconnects with an authorized account
+  // before UNAUTHORIZED_REDIRECT_DELAY_MS elapses.
   useEffect(() => {
     if (!account || !owner) return;
 
@@ -694,13 +784,14 @@ export default function AdminPage() {
       setAuthState("authorized");
     } else {
       setAuthState("unauthorized");
-      const timer = setTimeout(() => router.push("/"), 2000);
+      const timer = setTimeout(() => router.push("/"), UNAUTHORIZED_REDIRECT_DELAY_MS);
       return () => clearTimeout(timer);
     }
   }, [account, owner, router]);
 
-  // ── Early returns (before authorized render) ──────────────────────────────
+  // ── Authorization gate (early returns) ────────────────────────────────────
 
+  // Hold all output until client hydrates — avoids SSR/client HTML mismatch.
   if (!mounted) return null;
 
   if (typeof window.ethereum === "undefined") {
@@ -712,8 +803,10 @@ export default function AdminPage() {
     );
   }
 
-  // Show spinner until BOTH data is loaded AND auth is determined
-  if (dataLoading || (account && owner && authState === "loading")) {
+  // authState stays "loading" even after dataLoading flips — the auth useEffect
+  // runs on the next render cycle. Without this guard there's a single-frame
+  // white flash between spinner unmount and gate render.
+  if (dataLoading || authState === "loading") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Spinner />
@@ -740,7 +833,7 @@ export default function AdminPage() {
     );
   }
 
-  // Prevent flash of admin content during initial auth check
+  // Defensive: don't leak admin UI into an indeterminate auth state.
   if (authState !== "authorized") return null;
 
   // ── Authorized admin view ──────────────────────────────────────────────────
@@ -755,7 +848,7 @@ export default function AdminPage() {
         />
       )}
 
-      {/* Page header */}
+      {/* Owner address as trust signal — confirms connected wallet = contract deployer. */}
       <div className="border-b border-[var(--color-border)] pb-6">
         <h1 className="text-3xl font-serif text-[var(--color-text-primary)]">
           {t("label.adminPanel")}
@@ -765,7 +858,6 @@ export default function AdminPage() {
         </p>
       </div>
 
-      {/* Add Candidate */}
       <SectionCard title={t("label.addCandidate")}>
         <AddCandidateForm
           t={t}
@@ -774,12 +866,10 @@ export default function AdminPage() {
         />
       </SectionCard>
 
-      {/* Set Voting Period */}
       <SectionCard title={t("label.setVotingPeriod")}>
         <VotingPeriodForm t={t} showToast={showToast} />
       </SectionCard>
 
-      {/* Candidate Manager */}
       <SectionCard title={t("label.currentCandidates")}>
         <CandidateManager
           candidates={candidates}
