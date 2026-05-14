@@ -13,6 +13,11 @@
 
 ---
 
+### Link demo
+https://drive.google.com/file/d/1PM10n0N3bJxmJk7D6LKVZP6TsNOn-v2m/view
+
+---
+
 ## Kiến trúc hệ thống
 
 Hệ thống gồm 3 lớp giao tiếp với nhau:
